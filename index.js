@@ -1,90 +1,51 @@
-const axios = require('axios');
-const RSS = require('rss');
-require('dotenv').config();
+import axios from 'axios';
 
-class YouTubeRSS {
-  constructor() {
-    this.apis = [
-      {
-        name: 'youtube-v3',
-        url: 'https://youtube-v31.p.rapidapi.com/search',
-        headers: {
-          'X-RapidAPI-Key': process.env.RAPIDAPI_KEY1,
-          'X-RapidAPI-Host': 'youtube-v31.p.rapidapi.com'
-        }
-      },
-      // Add more API configurations
-    ];
-    this.currentApiIndex = 0;
+// Step 1: Fetch the channel ID
+const searchOptions = {
+  method: 'GET',
+  url: 'https://youtube138.p.rapidapi.com/search/',
+  params: { q: 'varun mayya', hl: 'en', gl: 'US' },
+  headers: {
+    'x-rapidapi-key': 'b600d64e1cmsh5e8caec07d76e2bp16d2e6jsnbad9153ff452',
+    'x-rapidapi-host': 'youtube138.p.rapidapi.com'
   }
+};
 
-  async getChannelVideos(channelName) {
-    for (let i = 0; i < this.apis.length; i++) {
-      try {
-        const api = this.apis[this.currentApiIndex];
-        const response = await axios.get(api.url, {
-          params: {
-            channelId: await this.getChannelId(channelName),
-            part: 'snippet,id',
-            order: 'date',
-            maxResults: 50
-          },
-          headers: api.headers
-        });
-        return response.data.items;
-      } catch (error) {
-        console.error(`API ${api.name} failed, trying next...`);
-        this.currentApiIndex = (this.currentApiIndex + 1) % this.apis.length;
-      }
-    }
-    throw new Error('All APIs failed');
+axios.request(searchOptions).then(function (response) {
+  // Extract the channel ID from the search results
+  const channelId = response.data.contents[1].video.author.channelId;
+  console.log("Channel ID:", channelId);
+
+  // Step 2: Fetch the list of videos for the channel
+  const channelVideosOptions = {
+    method: 'GET',
+  url: 'https://youtube138.p.rapidapi.com/channel/videos/',
+  params: {
+    id: 'UCJ5v_MCY6GNUBTO8-D3XoAg', // Replace with the channel ID
+    filter: 'videos_latest', // Filter for latest videos
+    hl: 'en', // Language
+    gl: 'US' // Region
+  },
+  headers: {
+    'x-rapidapi-key': 'b600d64e1cmsh5e8caec07d76e2bp16d2e6jsnbad9153ff452',
+    'x-rapidapi-host': 'youtube138.p.rapidapi.com'
   }
+  };
 
-  async getChannelId(channelName) {
-    const api = this.apis[this.currentApiIndex];
-    try {
-      const response = await axios.get('https://www.googleapis.com/youtube/v3/channels', {
-        params: {
-          forUsername: channelName,
-          part: 'id',
-          key: process.env.YOUTUBE_API_KEY
-        }
-      });
-      if (response.data.items.length > 0) {
-        return response.data.items[0].id;
-      } else {
-        throw new Error('Channel not found');
-      }
-    } catch (error) {
-      console.error('Failed to fetch channel ID:', error.message);
-      throw error;
-    }
-  }
+  axios.request(channelVideosOptions).then(function (response) {
+    // Extract the required video details
+    const videos = response.data.contents.map(video => ({
+      title: video
+      // description: video.video.description,
+      // thumbnail: video.video.thumbnails[0].url, // Use the first thumbnail
+      // channelName: video.video.author.title
+    }));
 
-  async generateRSS(channelName) {
-    const items = await this.getChannelVideos(channelName);
-    const feed = new RSS({
-      title: `${channelName} YouTube Videos`,
-      description: `Latest videos from ${channelName}`,
-      feed_url: 'http://example.com/rss.xml',
-      site_url: 'http://example.com'
-    });
+    console.log("Channel Videos:", videos);
+  }).catch(function (error) {
+    console.error("Error fetching channel videos:", error);
+  });
 
-    items.forEach(item => {
-      feed.item({
-        title: item.snippet.title,
-        description: item.snippet.description,
-        url: `https://youtube.com/watch?v=${item.id.videoId}`,
-        date: item.snippet.publishedAt,
-        enclosure: {
-          url: item.snippet.thumbnails.high.url,
-          type: 'image/jpeg'
-        }
-      });
-    });
-
-    return feed.xml();
-  }
-}
-
-module.exports = YouTubeRSS;
+}).catch(function (error) {
+  console.error("Error fetching channel ID:", error);
+});
